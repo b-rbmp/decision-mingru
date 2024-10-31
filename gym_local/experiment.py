@@ -98,6 +98,7 @@ def main(variant):
     model_type = variant['model_type']
     seed = variant['seed']
     device = 'cuda' if torch.cuda.is_available() else 'cpu'  #variant.get('device', 'cuda')
+    print(device)
 
     log_to_wandb = variant.get('log_to_wandb', False)
     if log_to_wandb:
@@ -105,9 +106,8 @@ def main(variant):
             wandb_name = f"{env_name}-{dataset}"
             group_name = model_type + '-' + wandb_name
             wandb.init(
-                name=wandb_name,
-                group=group_name,
-                project='[Decision Mamba] Gym',
+                project="decision-mingru",
+                entity="benchmark_bros",
                 config=variant,
             )
         else:

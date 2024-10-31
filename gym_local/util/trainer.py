@@ -4,7 +4,6 @@ import torch
 import gym
 
 from models.decision_transformer import DecisionTransformer
-from models.decision_mamba import DecisionMamba
 
 
 class Trainer:
@@ -222,21 +221,7 @@ def get_model_optimizer(variant, state_dim, act_dim, max_ep_len, device):
             attn_pdrop=variant['dropout'],
         )
     elif variant['model_type'] in ["dmamba-min", "dmamba"]:
-        model = DecisionMamba(
-            state_dim=state_dim,
-            act_dim=act_dim,
-            hidden_size=variant['embed_dim'],
-            max_length=variant['K'],
-            max_ep_len=max_ep_len,
-            remove_act_embs=variant['remove_act_embs'],
-            model_type=variant['model_type'],
-            n_layer=variant['n_layer'],
-            n_inner=4*variant['embed_dim'],
-            activation_function=variant['activation_function'],
-            resid_pdrop=variant['dropout'],
-            drop_p=variant['dropout'],
-            window_size=variant['conv_window_size'],
-        )
+        print("Model type not implemented")
     else:
         raise NotImplementedError
     model = model.to(device=device)

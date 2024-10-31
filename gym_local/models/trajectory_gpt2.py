@@ -15,10 +15,13 @@
 # limitations under the License.
 """PyTorch OpenAI GPT-2 model."""
 
-import os
+import os, sys
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from gym_local.models.minrnnnetwork import MinRNNNetwork
 import torch
 import torch.nn as nn
 #from torch.nn import CrossEntropyLoss, MSELoss
@@ -281,7 +284,8 @@ class Block(nn.Module):
         hidden_size = config.n_embd
         inner_dim = config.n_inner if config.n_inner is not None else 4 * hidden_size
         self.ln_1 = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
-        self.attn = Attention(hidden_size, n_ctx, config, scale, attn_index=attn_index)
+        #self.attn = Attention(hidden_size, n_ctx, config, scale, attn_index=attn_index)
+        self.rnn_network = MinRNNNetwork(input_dim=n_ctx, embedding_dim=hidden_size, num_layers=3, expansion_factor=2, dropout=0.1, rnn_architecture="minGRU")
         self.ln_2 = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
         # self.adapter_ln = nn.LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
         if config.add_cross_attention:
@@ -301,18 +305,12 @@ class Block(nn.Module):
             use_cache=False,
             output_attentions=False,
     ):
-        attn_outputs = self.attn(
-            self.ln_1(hidden_states),
-            layer_past=layer_past,
-            attention_mask=attention_mask,
-            head_mask=head_mask,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-        )
-        attn_output = attn_outputs[0]  # output_attn: a, present, (attentions)
-        outputs = attn_outputs[1:]
+        ln1_hidden_states = self.ln_1(hidden_states)        
+
+        outputs = self.rnn_network(ln1_hidden_states)
+
         # residual connection
-        hidden_states = attn_output + hidden_states
+        hidden_states = outputs + hidden_states
 
         if encoder_hidden_states is not None:
             # add one self-attention block for cross-attention
@@ -336,8 +334,8 @@ class Block(nn.Module):
         # residual connection
         hidden_states = hidden_states + feed_forward_hidden_states
         # hidden_states = hidden_states + self.adapter_ln(self.adapter_mlp(hidden_states))
-
-        outputs = [hidden_states] + outputs
+        
+        outputs = [hidden_states] + [outputs]
         return outputs  # hidden_states, present, (attentions, cross_attentions)
 
 
@@ -494,7 +492,6 @@ class GPT2Model(GPT2PreTrainedModel):
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
@@ -557,7 +554,7 @@ class GPT2Model(GPT2PreTrainedModel):
         # attention_probs has shape bsz x n_heads x N x N
         # head_mask has shape n_layer x batch x n_heads x N x N
         head_mask = self.get_head_mask(head_mask, self.config.n_layer)
-
+        
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
         # position_embeds = self.wpe(position_ids)
